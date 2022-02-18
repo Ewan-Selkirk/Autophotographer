@@ -31,13 +31,13 @@ def export_data(name, data):
 
 
 def as_percentage(value) -> float:
-    if not value < 0 and not value > 255:
-        if value < (256 / 2) - 1:
-            return value / ((256 / 2) - 1) * 100
-        else:
-            return (255 - value) / ((256 / 2) - 1) * 100
-    else:
+    if value < 0 or value > 255:
         raise ValueError("Value must be between 0-255")
+
+    if value <= 127:
+        return value / 127 * 100
+    else:
+        return 200 - (value / 127) * 100
 
 
 class Autophotographer:
@@ -55,7 +55,7 @@ class Autophotographer:
         success, image = video.read()
         f_count = 0
 
-        # Create an empty 2D array to store the frame number and it's average brightness
+        # Create an empty 2D array to store the frame number, and it's average brightness
         liked = [[]]
 
         while success:
@@ -92,6 +92,7 @@ class Autophotographer:
             path = rf'{self.path_out}{self.name}{c}.png'
             cv.imwrite(path, i)
             # print(f"Saved frame {i} to {path}")
+        print(f"Saved {len(images)} to {self.path_out}")
 
     def parse_config(self, config):
         pass
@@ -104,7 +105,7 @@ class Algorithms:
         self.image = image
 
     def average_brightness(self) -> float:
-        return np.average(self.image)
+        return as_percentage(np.average(self.image))
 
     def sharpness(self):
         pass
