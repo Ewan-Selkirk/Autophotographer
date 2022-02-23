@@ -40,17 +40,28 @@ def as_percentage(value) -> float:
         return 200 - (value / 127) * 100
 
 
+def log(message):
+    if verbose:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}]", message)
+
+
 class Autophotographer:
     def __init__(self, args):
         self.path_in = args.pathIn
         self.path_out = args.pathOut
         self.num_to_output = args.quantity
-        self.name = args.name
+        self.filename = args.name or str(f"{datetime.now().strftime('%d-%m-%y_%H-%M-%S_')}"
+                                         f"{args.pathIn.split('/')[-1][:-4]}_")
         # self.config = args.config
+
+        # Set the global verbose variable if the verbose argument is passed
+        global verbose
+        verbose = args.verbose
 
         self.find_best()
 
     def find_best(self):
+        t_start = datetime.now()
         video = cv.VideoCapture(self.path_in)
         success, image = video.read()
         f_count = 0
@@ -79,20 +90,23 @@ class Autophotographer:
             success, image = video.read()
             f_count += 1
 
-        print(f'Number of frames: {f_count}')
+        log(f'Number of frames: {f_count}')
 
         self.save_best(fetch_frames(video, liked))
         video.release()
+        t_end = datetime.now()
+        t_diff = (t_end - t_start).seconds
+        log(f"Operation took {str(divmod(t_diff, 60)[0]) + ' minutes and ' if divmod(t_diff, 60)[0] > 0 else ''}"
+            f"{divmod(t_diff, 60)[1]} seconds to complete")
 
     def save_best(self, images):
         for c, i in images:
             if not os.path.exists(self.path_out):
                 os.mkdir(self.path_out)
 
-            path = rf'{self.path_out}{self.name}{c}.png'
+            path = rf'{self.path_out}{self.filename}{c}.png'
             cv.imwrite(path, i)
-            # print(f"Saved frame {i} to {path}")
-        print(f"Saved {len(images)} to {self.path_out}")
+        log(f"Saved {len(images)} images to {self.path_out}")
 
     def parse_config(self, config):
         pass
@@ -103,6 +117,17 @@ class Autophotographer:
 class Algorithms:
     def __init__(self, image):
         self.image = image
+
+    def rot_split(self):
+        shape = self.image.shape
+
+        # Method for splitting images into chunks based on this StackOverflow answer
+        # https://stackoverflow.com/a/47581978
+        return [
+            self.image[x: x + shape[0] // 3, y: y + shape[1] // 3]
+            for x in range(0, shape[0], shape[0] // 3)
+            for y in range(0, shape[1], shape[1] // 3)
+        ]
 
     def average_brightness(self) -> float:
         return as_percentage(np.average(self.image))
@@ -119,8 +144,7 @@ if __name__ == "__main__":
     #                   choices=[], nargs="+")
     args.add_argument("-o", "--pathOut", help="Path to output saved images to", default=rf'{os.getcwd()}/Output/')
     args.add_argument("-q", "--quantity", help="Number of images to output", default=5)
-    args.add_argument("-n", "--name", help="The name of the files output (before file number is appended)",
-                      default=datetime.now().strftime('%d-%m-%y_%H-%M-%S_'))
+    args.add_argument("-n", "--name", help="The name of the files output (before file number is appended)")
     args.add_argument("-v", "--verbose", help="Prints messages to the console window", action="store_true")
 
     program = Autophotographer(args.parse_args())
