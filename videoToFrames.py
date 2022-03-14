@@ -297,6 +297,12 @@ class ImageCapture:
         else:
             pass
 
+    def set(self, prop, value):
+        if prop is cv.CAP_PROP_POS_FRAMES:
+            self.position = value
+        else:
+            pass
+
     def open(self, filename):
         if type(filename) is list:
             for img in filename:
