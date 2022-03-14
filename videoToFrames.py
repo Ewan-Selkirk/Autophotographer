@@ -86,7 +86,7 @@ class Autophotographer:
         # Set our console arguments as variables
         self.path_in = p_args.pathIn
         self.path_out = p_args.pathOut
-        self.num_to_output = p_args.quantity
+        self.num_to_output = int(p_args.quantity)
         self.filename = p_args.name or str(f"{datetime.now().strftime('%d-%m-%y_%H-%M-%S_')}"
                                            f"{p_args.pathIn.split('/')[-1][:-4]}_")
         self.config = p_args.config
@@ -148,7 +148,7 @@ class Autophotographer:
                 log(f"Working on frame {f_count}", parent=filename)
                 img_rot = Rule_of_Thirds(image)
 
-                score[f_count]["blurry"] = np.sum([img_rot.run_algorithm("is_blurry")]) / 9 * 100
+                score[f_count]["blurry"] = np.sum([not img_rot.run_algorithm("is_blurry", threshold=100)]) / 9 * 100
                 score[f_count]["thirdsy"] = np.std([[*img_rot.calc_diff(self.config)[c].values()]
                                                    for c in self.config])
 
@@ -161,7 +161,7 @@ class Autophotographer:
 
             data = []
             for k, v in score.items():
-                data.append([k, np.std([*v.values()])])
+                data.append([k, np.mean([*v.values()])])
 
             data.sort(key=lambda x: x[1], reverse=True)
             self.save_best(fetch_frames(video, data[:self.num_to_output]))
@@ -182,11 +182,6 @@ class Autophotographer:
             cv.imwrite(path, i)
         log(f"Saved {len(images)} images to {self.path_out}")
 
-    def parse_config(self, algorithm_obj):
-        for c in self.config:
-            # Use reflection to get pointers to the algorithm functions*-
-            return algorithm_obj.__getattribute__(c)
-
 
 # These algorithms take in an image and return a score based on the content of the image
 class Algorithms:
@@ -206,7 +201,7 @@ class Algorithms:
     def sharpness(self):
         pass
 
-    def is_blurry(self, threshold=200) -> bool:
+    def is_blurry(self, threshold) -> bool:
         return cv.Laplacian(self.image, cv.CV_64F).var() < threshold
 
 
@@ -234,9 +229,9 @@ class Rule_of_Thirds:
     def get_image_splits(self) -> []:
         return self.__split_img
 
-    def run_algorithm(self, algorithm) -> []:
+    def run_algorithm(self, algorithm, **kwargs) -> []:
         # Use reflection to call the method on a brand new `Algorithms` instance
-        return [Algorithms(s).__getattribute__(algorithm)() for s in self.__split_img]
+        return [getattr(Algorithms(s), algorithm)(*kwargs.values()) for s in self.__split_img]
 
     def setup_calc(self, config):
         data = {c: {} for c in config}
