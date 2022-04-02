@@ -65,10 +65,11 @@ def as_percentage(value, r_min, r_max) -> float:
 # Optional `parent` variable will print where the message is coming from (E.G. Which file is currently
 # being operated on)
 # (The owner variable will retain its value until it is changed or reset to nothing)
-def log(message, parent=None) -> None:
-    if verbose:
+# `Override` can be used to overwrite the verbose value for that log
+def log(message, parent=None, override: bool = False) -> None:
+    if verbose or override:
         global owner
-        if parent is not None and parent != owner:
+        if parent != owner:
             owner = parent
         print(f"[{datetime.now().strftime('%H:%M:%S')}]", f"{owner + ': ' if owner is not None else ''}{message}")
 
@@ -76,6 +77,24 @@ def log(message, parent=None) -> None:
 # Return a private function which returns 3 values from the provided array
 def get_array_vector(array) -> []:
     return lambda t: [array[t[i]] for i in range(len(t))] if type(t) is (tuple or list) else ValueError("")
+
+
+# Create an argparse ArgumentParser instance.
+def create_parser(**kwargs) -> argparse.ArgumentParser:
+    args = argparse.ArgumentParser(*kwargs.values())
+
+    args.add_argument("-i", "--pathIn", help="Path to either a directory of video files, or a specific video file.",
+                      required=True)
+    args.add_argument("-c", "--config", help="List of operations to perform on the input video file(s)", required=True,
+                      choices=["brightness", "sharpness", "color", "colour"], nargs="+")
+    args.add_argument("-o", "--pathOut", help="Path to output saved images to (will default to an 'Output' folder in "
+                                              "the current working directory)", default=rf'{os.getcwd()}/Output/')
+    args.add_argument("-q", "--quantity", help="Number of images to output", default=5)
+    args.add_argument("-n", "--name", help="The name of the files output (will default to the date and time, and the "
+                                           "original filename if left out)")
+    args.add_argument("-v", "--verbose", help="Prints messages to the console window", action="store_true")
+
+    return args
 
 
 class Autophotographer:
@@ -149,11 +168,10 @@ class Autophotographer:
                 img_rot = Rule_of_Thirds(image)
 
                 score[f_count]["blurry"] = np.sum([not img_rot.run_algorithm("is_blurry", threshold=100)]) / 9 * 100
-                score[f_count]["thirdsy"] = np.std([[*img_rot.calc_diff(self.config)[c].values()]
-                                                   for c in self.config])
+                score[f_count]["thirdsy"] = img_rot.is_thirdsy() * 100
 
                 for c in self.config:
-                    score[f_count][c] = np.mean(img_rot.run_algorithm(c))
+                    score[f_count][c] = np.mean([as_percentage(x, 0, 255) for x in img_rot.run_algorithm(c)])
 
                 # Try to read next frame and increase counter by 1
                 success, image = video.read()
@@ -170,8 +188,10 @@ class Autophotographer:
 
         t_end = datetime.now()
         t_diff = (t_end - t_start).seconds
-        log(f"Operation took {str(divmod(t_diff, 60)[0]) + 'minutes and ' if divmod(t_diff, 60)[0] > 0 else ''}"
-            f"{divmod(t_diff, 60)[1]} seconds to complete")
+        time = divmod(t_diff, 60)
+
+        log(f"Operation took {str(time[0]) + 'minutes and ' if time[0] > 0 else ''}{time[1]} seconds to complete",
+            parent=None, override=True)
 
     def save_best(self, images):
         for c, i in images:
@@ -180,7 +200,7 @@ class Autophotographer:
 
             path = os.path.join(self.path_out, self.filename + str(c) + '.png')
             cv.imwrite(path, i)
-        log(f"Saved {len(images)} images to {self.path_out}")
+        log(f"Saved {len(images)} images to {self.path_out}", override=True)
 
 
 # These algorithms take in an image and return a score based on the content of the image
@@ -193,6 +213,7 @@ class Algorithms:
         return result
 
     def color(self) -> float:
+        layers = [self.image[:, :, d] for d in range(self.image.shape[2])]
         pass
 
     def colour(self) -> float:
@@ -221,9 +242,9 @@ class Rule_of_Thirds:
         # https://stackoverflow.com/a/47581978
         # TODO: Fix issues with images that don't equally divide by 3
         self.__split_img = [
-            self.image[x: x + shape[0] // 3, y: y + shape[1] // 3]
-            for x in range(0, shape[0], shape[0] // 3)
-            for y in range(0, shape[1], shape[1] // 3)
+            self.image[y: y + shape[0] // 3, x: x + shape[1] // 3]
+            for y in range(0, shape[0], shape[0] // 3)
+            for x in range(0, shape[1], shape[1] // 3)
         ]
 
     def get_image_splits(self) -> []:
@@ -264,6 +285,21 @@ class Rule_of_Thirds:
                 data[c][v.name] = np.sum(data[c][v.name])
 
         return data
+
+    def is_thirdsy(self):
+        data = [np.average(s) for s in self.__split_img]
+        get_vector = get_array_vector(data)
+        result = {v.name: None for v in Array_Vector}
+
+        for v in Array_Vector:
+            mean = np.mean(get_vector(v.value))
+            result[v.name] = bool(((np.asarray(get_vector(v.value)) > 0) &
+                                   np.logical_and(np.asarray(get_vector(v.value)) > mean - 15,
+                                                  np.asarray(get_vector(v.value)) < mean + 15)).all())
+
+        log(f"Found rule of thirds in: {', '.join([k for k, v in result.items() if v is True])}", override=True)
+
+        return np.sum([*result.values()])
 
 
 class ImageCapture:
@@ -315,17 +351,5 @@ class ImageCapture:
 
 
 if __name__ == "__main__":
-    args = argparse.ArgumentParser()
-
-    args.add_argument("-i", "--pathIn", help="Path to either a directory of video files, or a specific video file.",
-                      required=True)
-    args.add_argument("-c", "--config", help="List of operations to perform on the input video file(s)", required=True,
-                      choices=["brightness", "sharpness", "color", "colour"], nargs="+")
-    args.add_argument("-o", "--pathOut", help="Path to output saved images to (will default to an 'Output' folder in "
-                                              "the current working directory)", default=rf'{os.getcwd()}/Output/')
-    args.add_argument("-q", "--quantity", help="Number of images to output", default=5)
-    args.add_argument("-n", "--name", help="The name of the files output (will default to the date and time, and the "
-                                           "original filename if left out)")
-    args.add_argument("-v", "--verbose", help="Prints messages to the console window", action="store_true")
-
+    args = create_parser()
     program = Autophotographer(args.parse_args())
