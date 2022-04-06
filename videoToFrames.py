@@ -240,12 +240,16 @@ class Rule_of_Thirds:
 
         # Method for splitting images into chunks based on this StackOverflow answer
         # https://stackoverflow.com/a/47581978
-        # TODO: Fix issues with images that don't equally divide by 3
         self.__split_img = [
             self.image[y: y + shape[0] // 3, x: x + shape[1] // 3]
             for y in range(0, shape[0], shape[0] // 3)
             for x in range(0, shape[1], shape[1] // 3)
         ]
+
+        # Extremely rudimentary 'fix' for issue #1
+        if len(self.__split_img) > 9:
+            for e in (3, 7, 11)[::-1]:
+                del self.__split_img[e]
 
     def get_image_splits(self) -> []:
         return self.__split_img
