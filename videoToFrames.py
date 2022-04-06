@@ -15,7 +15,9 @@ owner = None
 # (Use enum.Enum to avoid an `Enum` variable from being created)
 class Array_Vector(enum.Enum):
     TOP = (0, 1, 2)
+    CENTER_R = (3, 4, 5)
     LEFT = (0, 3, 6)
+    CENTER_C = (1, 4, 7)
     BOTTOM = (6, 7, 8)
     RIGHT = (2, 5, 8)
     # "You can't half a third!" blah blah blah fight me
@@ -159,7 +161,7 @@ class Autophotographer:
 
             # For every frame in the video, create an element for storing the scores
             # used to rate images
-            score = {f: {"blurry": None, "thirdsy": None, c: None}
+            score = {f: {"blurry": None, c: None}
                      for f in range(int(video.get(cv.CAP_PROP_FRAME_COUNT)))
                      for c in self.config}
 
@@ -168,10 +170,10 @@ class Autophotographer:
                 img_rot = Rule_of_Thirds(image)
 
                 score[f_count]["blurry"] = np.sum([not img_rot.run_algorithm("is_blurry", threshold=100)]) / 9 * 100
-                score[f_count]["thirdsy"] = img_rot.is_thirdsy() * 100
 
+                thirdsy = img_rot.is_thirdsy(self.config)
                 for c in self.config:
-                    score[f_count][c] = np.mean([as_percentage(x, 0, 255) for x in img_rot.run_algorithm(c)])
+                    score[f_count][c] = thirdsy[c]
 
                 # Try to read next frame and increase counter by 1
                 success, image = video.read()
@@ -213,13 +215,14 @@ class Algorithms:
         return result
 
     def color(self) -> float:
-        layers = [self.image[:, :, d] for d in range(self.image.shape[2])]
+        layers = cv.split(self.image)
         pass
 
     def colour(self) -> float:
         return self.color()
 
     def sharpness(self):
+        cv.Canny(self.image, 100, 200)
         pass
 
     def is_blurry(self, threshold) -> bool:
@@ -264,46 +267,41 @@ class Rule_of_Thirds:
 
         return data, vector
 
-    # def calc_mean(self, config):
-    #     data, vector = self.setup_calc(config)
-    #
-    #     for c in vector:
-    #         for e in Array_Vector:
-    #             data[c][e.name] = np.mean([vector[c](e.value)])
-    #
-    #     return data
+    def calc_diff(self, config: list[str]) -> dict[dict[float]]:
+        data, vector = self.setup_calc(config)
+        quadrants = ["LEFT-CENTER_C", "CENTER_C-RIGHT", "TOP-CENTER_R", "CENTER_R-BOTTOM"]
 
-    def calc_diff(self, config: list[str]):
-        data, _ = self.setup_calc(config)
+        change = {c: {d: 0.0} for c in config for d in quadrants}
 
         for c in config:
-            tmp = self.run_algorithm(c)
-
             for v in Array_Vector:
                 data[c][v.name] = []
+                data[c][v.name] = np.sum(vector[c](v.value))
 
-                data[c][v.name].append(abs(tmp[v.value[0]] - tmp[v.value[1]]))
-                data[c][v.name].append(abs(tmp[v.value[0]] - tmp[v.value[2]]))
-                data[c][v.name].append(abs(tmp[v.value[1]] - tmp[v.value[2]]))
+            for q in quadrants:
+                change[c][q] = abs(data[c][q.split("-")[0]] - data[c][q.split("-")[1]])
+                # log(abs(data[c][q.split("-")[0]] - data[c][q.split("-")[1]]), parent=q, override=True)
 
-                data[c][v.name] = np.sum(data[c][v.name])
+        return {c: {k: v for k, v in sorted(change[c].items(), key=lambda x: x[1], reverse=True)} for c in config}
 
-        return data
+    def is_thirdsy(self, config: list[str]):
+        change = self.calc_diff(config)
+        result = {c: 0.0 for c in config}
 
-    def is_thirdsy(self):
-        data = [np.average(s) for s in self.__split_img]
-        get_vector = get_array_vector(data)
-        result = {v.name: None for v in Array_Vector}
+        for c in config:
+            tmp = []
+            for i in range(len(change[c].values()) - 1):
+                if len(tmp) == 0:
+                    tmp.append(list(change[c].values())[i])
+                else:
+                    if list(change[c].values())[i + 1] > list(change[c].values())[i] - 30:
+                        tmp.append(list(change[c].values())[i])
+                    else:
+                        break
 
-        for v in Array_Vector:
-            mean = np.mean(get_vector(v.value))
-            result[v.name] = bool(((np.asarray(get_vector(v.value)) > 0) &
-                                   np.logical_and(np.asarray(get_vector(v.value)) > mean - 15,
-                                                  np.asarray(get_vector(v.value)) < mean + 15)).all())
+            result[c] = np.sum(tmp)
 
-        log(f"Found rule of thirds in: {', '.join([k for k, v in result.items() if v is True])}", override=True)
-
-        return np.sum([*result.values()])
+        return result
 
 
 class ImageCapture:
