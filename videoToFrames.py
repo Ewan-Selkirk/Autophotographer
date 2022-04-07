@@ -99,6 +99,26 @@ def create_parser(**kwargs) -> argparse.ArgumentParser:
     return args
 
 
+def parse_name_arg(args) -> str:
+    tokens = {
+        "%dt": datetime.now().strftime('%d-%m-%y_%H-%M-%S'),
+        "%d": datetime.now().strftime("%d-%m-%y"),
+        "%t": datetime.now().strftime("%H-%M-%S"),
+        "%f": args.pathIn.split('/')[-1][:-4],
+        "%o": '-'.join(args.config),
+        "%os": '-'.join([c[0] for c in args.config])
+    }
+
+    if not args.name:
+        return str(f"{tokens['%dt']}_{tokens['%f']}")
+    else:
+        # Token matching
+        for t in re.findall(r"%[a-zA-Z]+", args.name):
+            args.name = args.name.replace(t, tokens[t])
+
+    return args.name
+
+
 class Autophotographer:
     def __init__(self, p_args):
         # Create an array to store our loaded video files in
@@ -108,8 +128,7 @@ class Autophotographer:
         self.path_in = p_args.pathIn
         self.path_out = p_args.pathOut
         self.num_to_output = int(p_args.quantity)
-        self.filename = p_args.name or str(f"{datetime.now().strftime('%d-%m-%y_%H-%M-%S_')}"
-                                           f"{p_args.pathIn.split('/')[-1][:-4]}_")
+        self.filename = parse_name_arg(p_args)
         self.config = p_args.config
 
         # Set the global verbose variable if the verbose argument is passed
@@ -192,7 +211,7 @@ class Autophotographer:
         t_diff = (t_end - t_start).seconds
         time = divmod(t_diff, 60)
 
-        log(f"Operation took {str(time[0]) + 'minutes and ' if time[0] > 0 else ''}{time[1]} seconds to complete",
+        log(f"Operation took {str(time[0]) + ' minutes and ' if time[0] > 0 else ''}{time[1]} seconds to complete",
             parent=None, override=True)
 
     def save_best(self, images):

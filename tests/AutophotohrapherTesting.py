@@ -16,13 +16,27 @@ class ArgumentTesting(unittest.TestCase):
         self.good_args = ["-i", test_vid, "-c", "brightness"]
 
     def test_required_filepath(self):
-        with self.assertRaises(SystemExit) as cm:
-            self.parser.parse_args(["-i", test_vid])
+        # For the program to work, it needs an input file '-i' and a measure to run '-m'.
+        # If neither are present then the program should display an error and exit
+        for a in [["-i", test_vid], ["-c", "brightness"], []]:
+            with self.subTest(a=a):
+                with self.assertRaises(SystemExit) as cm:
+                    self.parser.parse_args(a)
 
-        self.assertEqual(cm.exception.code, 2)
+                self.assertEqual(cm.exception.code, 2)
 
     def test_verbose_arg(self):
+        # Check the verbose flag is being set when the verbose argument is passed
         self.assertTrue(self.parser.parse_args(self.good_args + ["-v"]).verbose)
+
+    def test_name_arg_tokens(self):
+        #
+        self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%d_%f"])),
+                         f"{datetime.now().strftime('%d-%m-%y')}_tram")
+
+    def test_no_name_arg(self):
+        self.assertEqual(parse_name_arg((self.parser.parse_args(self.good_args))),
+                         f"{datetime.now().strftime('%d-%m-%y_%H-%M-%S')}_tram")
 
 
 class RuleOfThirdsTesting(unittest.TestCase):
@@ -36,7 +50,13 @@ class RuleOfThirdsTesting(unittest.TestCase):
         self.assertTrue(len(Rule_of_Thirds(np.zeros((768, 1024, 3), dtype=np.uint8)).get_image_splits()) == 9)
 
     def test_run_algorithm(self):
-        pass
+        brightness = Rule_of_Thirds(cv.imread(test_img)).run_algorithm("brightness")
+        self.assertEqual(len(brightness), 9)
+        self.assertTrue(type(brightness[0]) is not np.ndarray and type(brightness[0]) is np.float64 or float)
+
+    def test_run_fake_algorithm(self):
+        with self.assertRaises(AttributeError):
+            fake = Rule_of_Thirds(cv.imread(test_img)).run_algorithm("cakes")
 
 
 class ImageCaptureTesting(unittest.TestCase):
