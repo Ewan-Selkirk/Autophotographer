@@ -101,12 +101,20 @@ def create_parser(**kwargs) -> argparse.ArgumentParser:
 
 def parse_name_arg(args) -> str:
     tokens = {
+        # Date and Time
         "%dt": datetime.now().strftime('%d-%m-%y_%H-%M-%S'),
+        # Date
         "%d": datetime.now().strftime("%d-%m-%y"),
+        # Time
         "%t": datetime.now().strftime("%H-%M-%S"),
+        # Current File Name
         "%f": args.pathIn.split('/')[-1][:-4],
+        # Operations (E.G. Brightness, Color, Sharpness)
         "%o": '-'.join(args.config),
-        "%os": '-'.join([c[0] for c in args.config])
+        # Short Operations (E.G. B, C, S)
+        "%os": '-'.join([c[0] for c in args.config]),
+        # Escaped Percentage
+        "%%": "%"
     }
 
     if not args.name:
@@ -114,7 +122,11 @@ def parse_name_arg(args) -> str:
     else:
         # Token matching
         for t in re.findall(r"%[a-zA-Z]+", args.name):
-            args.name = args.name.replace(t, tokens[t])
+            try:
+                args.name = args.name.replace(t, tokens[t])
+            except KeyError as err:
+                args.name = args.name.replace('%', '')
+                log(f"Could not find token: {err}... Skipping...", override=True)
 
     return args.name
 
@@ -241,8 +253,10 @@ class Algorithms:
         return self.color()
 
     def sharpness(self):
-        cv.Canny(self.image, 100, 200)
-        pass
+        edge = cv.Canny(self.image, 100, 200)
+        edge_count = np.sum(edge, where=lambda p: p == 255) // 255
+
+        return edge_count
 
     def is_blurry(self, threshold) -> bool:
         return cv.Laplacian(self.image, cv.CV_64F).var() < threshold

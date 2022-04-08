@@ -7,7 +7,7 @@ img_dir = "../images/"
 test_vid = img_dir + "tram.mp4"
 test_img = img_dir + "rule_of_thirds/rot_left.png"
 
-config = ["brightness"]
+config = ["brightness", "sharpness"]
 
 
 class ArgumentTesting(unittest.TestCase):
@@ -34,9 +34,15 @@ class ArgumentTesting(unittest.TestCase):
         self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%d_%f"])),
                          f"{datetime.now().strftime('%d-%m-%y')}_tram")
 
-    def test_no_name_arg(self):
-        self.assertEqual(parse_name_arg((self.parser.parse_args(self.good_args))),
+    def test_default_name(self):
+        self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args)),
                          f"{datetime.now().strftime('%d-%m-%y_%H-%M-%S')}_tram")
+
+    def test_name_wrong_token(self):
+        self.assertTrue(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%doesntexist"])),
+                        "%doesntexist")
+        self.assertTrue(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%f%doesntexist"])),
+                        "tramdoesntexist")
 
 
 class RuleOfThirdsTesting(unittest.TestCase):
