@@ -121,7 +121,7 @@ def parse_name_arg(args) -> str:
         return str(f"{tokens['%dt']}_{tokens['%f']}")
     else:
         # Token matching
-        for t in re.findall(r"%[a-zA-Z]+", args.name):
+        for t in re.findall(r"%[a-zA-Z]+|%%", args.name):
             try:
                 args.name = args.name.replace(t, tokens[t])
             except KeyError as err:
@@ -148,6 +148,7 @@ class Autophotographer:
         verbose = p_args.verbose
 
         self.start()
+        self.find_best()
 
     def start(self):
         if not os.path.exists(self.path_in):
@@ -177,8 +178,6 @@ class Autophotographer:
                     self.video.append([filename, cv.VideoCapture(os.path.join(self.path_in, filename))])
 
             log(f"Found {len(self.video)} {'files' if len(self.video) > 1 else 'file'} to operate on!", parent=None)
-
-        self.find_best()
 
     def find_best(self):
         t_start = datetime.now()
@@ -315,7 +314,8 @@ class Rule_of_Thirds:
                 change[c][q] = abs(data[c][q.split("-")[0]] - data[c][q.split("-")[1]])
                 # log(abs(data[c][q.split("-")[0]] - data[c][q.split("-")[1]]), parent=q, override=True)
 
-        return {c: {k: v for k, v in sorted(change[c].items(), key=lambda x: x[1], reverse=True)} for c in config}
+        return {c: {k: v for k, v in sorted(change[c].items(), key=lambda x: x[1], reverse=True if c != "sharpness"
+                else False)} for c in config}
 
     def is_thirdsy(self, config: list[str]):
         change = self.calc_diff(config)

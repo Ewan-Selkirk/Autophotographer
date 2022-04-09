@@ -25,6 +25,11 @@ class ArgumentTesting(unittest.TestCase):
 
                 self.assertEqual(cm.exception.code, 2)
 
+    def test_wrong_image(self):
+        with self.assertRaises(FileNotFoundError):
+            args = ["-i", "does_not_exist.png", "-c", "brightness"]
+            Autophotographer((self.parser.parse_args(args))).start()
+
     def test_verbose_arg(self):
         # Check the verbose flag is being set when the verbose argument is passed
         self.assertTrue(self.parser.parse_args(self.good_args + ["-v"]).verbose)
@@ -43,6 +48,10 @@ class ArgumentTesting(unittest.TestCase):
                         "%doesntexist")
         self.assertTrue(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%f%doesntexist"])),
                         "tramdoesntexist")
+
+    def test_name_escape_tokens(self):
+        self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%%"])),
+                         "%")
 
 
 class RuleOfThirdsTesting(unittest.TestCase):
@@ -103,10 +112,8 @@ class TestImagesTesting(unittest.TestCase):
 
         for c in config:
             with self.subTest(c=c):
-                self.assertTrue(
-                    list(diff[c].items())[0][0] == "LEFT-CENTER_C" and
-                    list(diff[c].items())[1][0] == "CENTER_R-BOTTOM"
-                )
+                self.assertCountEqual(list(diff[c].keys())[:2],
+                ["LEFT-CENTER_C", "CENTER_R-BOTTOM"])
 
     def test_rot_left_rainbow(self):
         image = cv.imread(img_dir + "/rule_of_thirds/rot_left_rainbow.png")
@@ -124,10 +131,7 @@ class TestImagesTesting(unittest.TestCase):
 
         for c in config:
             with self.subTest(c=c):
-                if c == "brightness":
-                    self.assertTrue(list(diff[c].items())[0][1] == 0.0)
-                else:
-                    pass
+                self.assertTrue(list(diff[c].items())[0][1] == 0.0)
 
 
 if __name__ == '__main__':
