@@ -152,7 +152,7 @@ class Autophotographer:
 
     def start(self):
         if not os.path.exists(self.path_in):
-            raise FileNotFoundError("")
+            raise FileNotFoundError("The input file could not be found...")
 
         # Check if the input path ends with a file extension using Regular Expression
         if re.search(r"\.\w{3}", self.path_in):
@@ -177,7 +177,8 @@ class Autophotographer:
                 else:
                     self.video.append([filename, cv.VideoCapture(os.path.join(self.path_in, filename))])
 
-            log(f"Found {len(self.video)} {'files' if len(self.video) > 1 else 'file'} to operate on!", parent=None)
+            log(f"Found {len(self.video)} {'files' if len(self.video) > 1 else 'file'} to operate on!", parent=None,
+                override=True)
 
     def find_best(self):
         t_start = datetime.now()
@@ -246,9 +247,9 @@ class Algorithms:
 
     def color(self) -> float:
         layers = cv.split(self.image)
-        pass
+        return np.average([np.var(layers)]) / 10
 
-    def colour(self) -> float:
+    def colour(self):
         return self.color()
 
     def sharpness(self):
@@ -314,8 +315,7 @@ class Rule_of_Thirds:
                 change[c][q] = abs(data[c][q.split("-")[0]] - data[c][q.split("-")[1]])
                 # log(abs(data[c][q.split("-")[0]] - data[c][q.split("-")[1]]), parent=q, override=True)
 
-        return {c: {k: v for k, v in sorted(change[c].items(), key=lambda x: x[1], reverse=True if c != "sharpness"
-                else False)} for c in config}
+        return {c: {k: v for k, v in sorted(change[c].items(), key=lambda x: x[1], reverse=True)} for c in config}
 
     def is_thirdsy(self, config: list[str]):
         change = self.calc_diff(config)
@@ -329,8 +329,6 @@ class Rule_of_Thirds:
                 else:
                     if list(change[c].values())[i + 1] > list(change[c].values())[i] - 30:
                         tmp.append(list(change[c].values())[i])
-                    else:
-                        break
 
             result[c] = np.sum(tmp)
 

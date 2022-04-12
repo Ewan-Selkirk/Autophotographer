@@ -1,19 +1,22 @@
+# The paths in the test file are set to be run from the root folder
+# as opposed to the 'tests' folder.
+
 import unittest
 from videoToFrames import *
 
 # These files aren't included in the repo, so they will need to be changed
 # to paths of files that exist on your system
-img_dir = "../images/"
+img_dir = "images/"
 test_vid = img_dir + "tram.mp4"
 test_img = img_dir + "rule_of_thirds/rot_left.png"
 
-config = ["brightness", "sharpness"]
+config = ["brightness", "sharpness", "color"]
 
 
 class ArgumentTesting(unittest.TestCase):
     def setUp(self) -> None:
         self.parser = create_parser(exit_on_error=False)
-        self.good_args = ["-i", test_vid, "-c", "brightness"]
+        self.good_args = ["-i", test_vid, "-c"] + config
 
     def test_required_filepath(self):
         # For the program to work, it needs an input file '-i' and a measure to run '-m'.
@@ -50,8 +53,7 @@ class ArgumentTesting(unittest.TestCase):
                         "tramdoesntexist")
 
     def test_name_escape_tokens(self):
-        self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%%"])),
-                         "%")
+        self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%%"])), "%")
 
 
 class RuleOfThirdsTesting(unittest.TestCase):
@@ -88,6 +90,7 @@ class ImageCaptureTesting(unittest.TestCase):
         ic = ImageCapture(img_dir + "rule_of_thirds/")
         self.assertTrue(ic.read()[0])
         self.assertGreater(ic.get(cv.CAP_PROP_FRAME_COUNT), 1)
+        self.assertEqual(ic.get(cv.CAP_PROP_FRAME_COUNT), len(os.listdir(img_dir + "rule_of_thirds/")))
 
     def test_get_image_frame(self):
         ic = ImageCapture(img_dir + "rule_of_thirds/")
@@ -113,7 +116,7 @@ class TestImagesTesting(unittest.TestCase):
         for c in config:
             with self.subTest(c=c):
                 self.assertCountEqual(list(diff[c].keys())[:2],
-                ["LEFT-CENTER_C", "CENTER_R-BOTTOM"])
+                                      ["LEFT-CENTER_C", "CENTER_R-BOTTOM"])
 
     def test_rot_left_rainbow(self):
         image = cv.imread(img_dir + "/rule_of_thirds/rot_left_rainbow.png")
@@ -122,7 +125,10 @@ class TestImagesTesting(unittest.TestCase):
 
         for c in config:
             with self.subTest(c=c):
-                self.assertTrue(list(diff[c].items())[0][0] == "LEFT-CENTER_C")
+                if c == "sharpness":
+                    self.assertCountEqual(list(diff[c].values()), [0.0, 0.0, 0.0, 0.0])
+                else:
+                    self.assertTrue(list(diff[c].items())[0][0] == "LEFT-CENTER_C")
 
     def test_rot_rgb(self):
         image = cv.imread(img_dir + "/rule_of_thirds/rot_rgb.png")
