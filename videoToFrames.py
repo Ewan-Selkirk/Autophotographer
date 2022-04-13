@@ -99,7 +99,8 @@ def create_parser(**kwargs) -> argparse.ArgumentParser:
     return args
 
 
-def parse_name_arg(args) -> str:
+def parse_name_arg(args, name=None) -> str:
+    # TODO: Fix this horrible 'fix'
     tokens = {
         # Date and Time
         "%dt": datetime.now().strftime('%d-%m-%y_%H-%M-%S'),
@@ -108,7 +109,7 @@ def parse_name_arg(args) -> str:
         # Time
         "%t": datetime.now().strftime("%H-%M-%S"),
         # Current File Name
-        "%f": args.pathIn.split('/')[-1][:-4],
+        "%f": name or args.pathIn.split('/')[-1][:-4],
         # Operations (E.G. Brightness, Color, Sharpness)
         "%o": '-'.join(args.config),
         # Short Operations (E.G. B, C, S)
@@ -117,6 +118,7 @@ def parse_name_arg(args) -> str:
         "%%": "%"
     }
 
+    # Return a default value if no name argument is passed
     if not args.name:
         return str(f"{tokens['%dt']}_{tokens['%f']}")
     else:
@@ -128,7 +130,7 @@ def parse_name_arg(args) -> str:
                 args.name = args.name.replace('%', '')
                 log(f"Could not find token: {err}... Skipping...", override=True)
 
-    return args.name
+        return args.name
 
 
 class Autophotographer:
@@ -136,16 +138,18 @@ class Autophotographer:
         # Create an array to store our loaded video files in
         self.video = []
 
-        # Set our console arguments as variables
-        self.path_in = p_args.pathIn
-        self.path_out = p_args.pathOut
-        self.num_to_output = int(p_args.quantity)
-        self.filename = parse_name_arg(p_args)
-        self.config = p_args.config
+        self.args = p_args
 
-        # Set the global verbose variable if the verbose argument is passed
+        # Set our console arguments as variables
+        self.path_in = self.args.pathIn
+        self.path_out = self.args.pathOut
+        self.num_to_output = int(self.args.quantity)
+        self.filename = self.args.name
+        self.config = self.args.config
+
+        # Set the global verbose variable if the 'verbose' argument is passed
         global verbose
-        verbose = p_args.verbose
+        verbose = self.args.verbose
 
         self.start()
         self.find_best()
@@ -166,14 +170,14 @@ class Autophotographer:
             # Create an ImageCapture object for any image files found in the directory
             images = ImageCapture(None)
 
-            for filename in os.listdir(self.path_in):
+            for filename in [x for x in os.listdir(self.path_in) if re.search(r"\.\w{3}", x)]:
                 if filename.endswith((".png", ".jpg")):
 
                     if images.get(cv.CAP_PROP_FRAME_COUNT) != len([x for x in os.listdir(self.path_in)
-                                                                   if re.search(r"\.\w{3}", x)]):
+                                                                   if re.search(r"\.(png)|\.(jpg)", x)]):
                         images.open([os.path.join(self.path_in, x) for x in os.listdir(self.path_in)
                                      if re.search(r"\.\w{3}", x)])
-                        self.video.append([self.path_in.split("/")[-2], images])
+                        self.video.append([filename, images])
                 else:
                     self.video.append([filename, cv.VideoCapture(os.path.join(self.path_in, filename))])
 
@@ -215,7 +219,7 @@ class Autophotographer:
                 data.append([k, np.mean([*v.values()])])
 
             data.sort(key=lambda x: x[1], reverse=True)
-            self.save_best(fetch_frames(video, data[:self.num_to_output]))
+            self.save_best(fetch_frames(video, data[:self.num_to_output]), filename[:-4])
 
             video.release()
 
@@ -226,12 +230,12 @@ class Autophotographer:
         log(f"Operation took {str(time[0]) + ' minutes and ' if time[0] > 0 else ''}{time[1]} seconds to complete",
             parent=None, override=True)
 
-    def save_best(self, images):
+    def save_best(self, images, name):
         for c, i in images:
             if not os.path.exists(self.path_out):
                 os.mkdir(self.path_out)
 
-            path = os.path.join(self.path_out, self.filename + str(c) + '.png')
+            path = os.path.join(self.path_out, parse_name_arg(self.args, name) + str(c) + '.png')
             cv.imwrite(path, i)
         log(f"Saved {len(images)} images to {self.path_out}", override=True)
 
