@@ -33,6 +33,12 @@ class ArgumentTesting(unittest.TestCase):
             args = ["-i", "does_not_exist.png", "-c", "brightness"]
             Autophotographer((self.parser.parse_args(args))).start()
 
+    def test_wrong_config(self):
+        with self.assertRaises(SystemExit) as cm:
+            self.parser.parse_args(["-i", "test", "-c", "people"])
+
+        self.assertTrue(cm.exception.code, 2)
+
     def test_verbose_arg(self):
         # Check the verbose flag is being set when the verbose argument is passed
         self.assertTrue(self.parser.parse_args(self.good_args + ["-v"]).verbose)
@@ -54,6 +60,10 @@ class ArgumentTesting(unittest.TestCase):
 
     def test_name_escape_tokens(self):
         self.assertEqual(parse_name_arg(self.parser.parse_args(self.good_args + ["-n", "%%"])), "%")
+
+    def test_two_colors(self):
+        self.assertCountEqual(parse_config_arg(self.parser.parse_args(["-i", "test", "-c", "color", "colour"]).config),
+                              {"color"})
 
 
 class RuleOfThirdsTesting(unittest.TestCase):

@@ -133,6 +133,17 @@ def parse_name_arg(args, name=None) -> str:
         return args.name
 
 
+def parse_config_arg(config):
+    config_set = set(config)
+
+    # Remove an instance of 'colour' if two exist as they are aliases for
+    # the same algorithm.
+    if "color" in config_set and "colour" in config_set:
+        config_set.remove("colour")
+
+    return config_set
+
+
 class Autophotographer:
     def __init__(self, p_args):
         # Create an array to store our loaded video files in
@@ -145,7 +156,7 @@ class Autophotographer:
         self.path_out = self.args.pathOut
         self.num_to_output = int(self.args.quantity)
         self.filename = self.args.name
-        self.config = self.args.config
+        self.config = parse_config_arg(self.args.config)
 
         # Set the global verbose variable if the 'verbose' argument is passed
         global verbose
