@@ -34,7 +34,7 @@ of each of the 9 quadrants of an image.
 |------------|-----------|--------------------------------------------------------------|-------------------------------------|
 | -i         | --pathIn  | The file or directory of files to run the program on         | N/A                                 |
 | -c         | --config  | A list of algorithms to run on the video (multiple accepted) | brightness, sharpness, colour/color |
-|
+
 ### Optional
 | Short-code | Long-code  | Description                                                                                                                                                               |
 |------------|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -68,6 +68,14 @@ Below are the list of tokens that are currently supported:
   - virtualenv (if you don't want packages installed globally)
   - opencv-contrib-python >= 4.5.5.60 or opencv-python >= 4.5.5.60
   - numpy >= 1.22
+  - tox >= 3.25.0
+
+### Running Tox Tests
+#### With PyCharm
+Right-click the tox.ini file and select 'Run'. PyCharm will generate the run configuration based on the ini file. 
+
+#### Manually
+If using a virtual environment, source into the environment (or activate if on Windows) and simply run 'tox' from the main directory.
 
 ----------
 

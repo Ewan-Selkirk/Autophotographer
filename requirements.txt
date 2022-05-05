@@ -1,2 +1,3 @@
 numpy==1.22.2
 opencv-contrib-python==4.5.5.62
+tox==3.25.0

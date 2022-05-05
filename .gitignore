@@ -1,4 +1,6 @@
 .idea
+.tox
 Output
 
 *.mp4
+MANIFEST
